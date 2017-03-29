@@ -158,14 +158,14 @@ class Customers():
         dummy_time_windows = np.random.random_integers(min_tw * 3600,
                                                        max_tw * 3600, 2*num_custs+1)
         # The last time a pickup window can start
-        latest_time = self.time_horizon - pu_time_windows
+        latest_time = self.time_horizon - pu_time_windows - 6 * 3600 # arbitrary
         start_times = [None for o in dummy_time_windows]
-        cust_times = [None for o in dummy_time_windows]
+        end_times = [None for o in dummy_time_windows]
         # Make random timedeltas, nominaly from the start of the day.
         for idx in range(1,num_custs+1):
             stime = int(np.random.random_integers(0, latest_time[idx]))
             start_times[idx] = timedelta(seconds=stime)
-            cust_times[idx] = (start_times[idx] +
+            end_times[idx] = (start_times[idx] +
                                timedelta(seconds=int(pu_time_windows[idx])))
             from_lat = lats[idx]
             from_lon = lons[idx]
@@ -178,7 +178,7 @@ class Customers():
             # add distance to start times to approximate real delivery time windows
             dtime = stime + self.travel_time( od_dist )
             start_times[idx+num_custs] = timedelta(seconds=dtime)
-            cust_times[idx+num_custs] = (start_times[idx+num_custs] +
+            end_times[idx+num_custs] = (start_times[idx+num_custs] +
                                            timedelta(seconds=int(pu_time_windows[idx])))
 
         # A named tuple for the customer
@@ -192,7 +192,7 @@ class Customers():
         self.customers = [Customer(idx, dem, lat, lon, tw_open, tw_close) for
                           idx, dem, lat, lon, tw_open, tw_close
                           in zip(stops, demands, lats, lons,
-                                 start_times, cust_times)]
+                                 start_times, end_times)]
 
         # The number of seconds needed to 'unload' 1 unit of goods.
         self.service_time_per_dem = 300  # seconds
@@ -622,11 +622,11 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
 
 
 def main():
-    num_custs = 5
+    num_custs = 50
     # Create a set of customer, (and depot) custs.
-    customers = Customers(num_custs=num_custs, min_demand=2,
-                          max_demand=15, box_size=40,
-                          min_tw=3, max_tw=6)
+    customers = Customers(num_custs=num_custs, min_demand=1,
+                          max_demand=3, box_size=40,
+                          min_tw=1, max_tw=3)
 
     print(customers.customers)
 
@@ -755,7 +755,7 @@ def main():
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
-            print('open: ' +str(cust.tw_open.seconds) +' close: '+str(cust.tw_close.seconds))
+            print('open: ' +str(cust.tw_open) +' close: '+str(cust.tw_close))
             time_dimension.CumulVar(routing.NodeToIndex(cust.index)).SetRange(
                 cust.tw_open.seconds,
                 cust.tw_close.seconds)
