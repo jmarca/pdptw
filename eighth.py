@@ -377,7 +377,9 @@ class Customers():
 
         """
         def service_time_return(a, b):
-            return(abs(self.customers[a].demand * self.service_time_per_dem))
+            service_cost = self.customers[a].demand * self.service_time_per_dem
+            # print("demand: "+str(self.customers[a].demand) + "cost: "+str(service_cost))
+            return(abs(service_cost))
 
         return service_time_return
 
@@ -464,21 +466,34 @@ class Vehicles():
     def get_total_capacity(self):
         return(sum([c.capacity for c in self.vehicles]))
 
-    def return_starting_callback(self, customers, sameStartFinish=False):
+    def return_starting_callback(self, customers, sameStartFinish=True):
         # create a different starting and finishing depot for each vehicle
-        self.starts = [0 for o in
-                       range(self.number)]
+        depots = customers.depots # array of depot indices
+        num_depots = len(depots)
         if sameStartFinish:
+            self.starts = [depots[o % rounnum_depots]
+                           for o in
+                           range(self.number)]
             self.ends = self.starts
         else:
-            self.ends = [0  for
-                         o in range(self.number)]
-        # the depots will not have demands, so zero them.
+            start_depots = round(num_depots/2)
+            end_depots = num_depots - start_depots
+            self.starts = [depots[o % start_depots]
+                           for o in
+                           range(self.number)]
+            self.ends = [depots[start_depots + (o % end_depots)]
+                         for o in
+                         range(self.number)]
+            # print(self.starts)
+            # print(self.ends)
+
+        # the depots will not have demands, so zero them.  they should
+        # already be zero.  this is vestigal but catches bugs while
+        # I'm transitioning code
         for depot in self.starts:
             customers.zero_depot_demands(depot)
         for depot in self.ends:
             customers.zero_depot_demands(depot)
-
         def start_return(v): return(self.starts[v])
         return start_return
 
@@ -641,13 +656,15 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
 
 
 def main():
-    num_custs = 100
+    num_custs = 10000
+    num_vehicles = 2500
+    num_depots = 500
     # Create a set of customer, (and depot) custs.
     customers = Customers(num_custs=num_custs, min_demand=1,
                           max_demand=3, box_size=40,
-                          min_tw=1, max_tw=3)
+                          min_tw=1, max_tw=3, num_depots=num_depots)
 
-    print(customers.customers)
+    # print(customers.customers)
 
     # Create callback fns for distances, demands, service and transit-times.
     dist_fn = customers.return_dist_callback()
@@ -659,10 +676,13 @@ def main():
         """
         The time function we want is both transit time and service time.
         """
-        return serv_time_fn(a, b) + transit_time_fn(a, b)
+        st = serv_time_fn(a, b)
+        tt = transit_time_fn(a, b)
+        # print('from '+str(a)+' to '+str(b) + ' service_time: '+str(st) + ' transit_time: '+str(tt))
+        return st + tt
 
     # Create a list of inhomgenious vehicle capacities as integer units.
-    capacity = [50, 75, 100, 125, 150, 175, 200, 250, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4]
+    capacity = np.random.random_integers(3, 9, num_vehicles)
 
     # Create a list of inhomogenious fixed vehicle costs.
     cost = [int(100 + 2 * np.sqrt(c)) for c in capacity]
@@ -674,9 +694,8 @@ def main():
     # assert(customers.get_total_demand() < vehicles.get_total_capacity())
 
     # Set the starting nodes, and create a callback fn for the starting node.
-    print(customers.customers)
     start_fn = vehicles.return_starting_callback(customers,
-                                                 sameStartFinish=True)
+                                                 sameStartFinish=False)
 
     print('start function set')
     print(customers.customers)
