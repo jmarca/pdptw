@@ -695,7 +695,7 @@ def main():
 
     # Set the starting nodes, and create a callback fn for the starting node.
     start_fn = vehicles.return_starting_callback(customers,
-                                                 sameStartFinish=False)
+                                                 sameStartFinish=True)
 
     print('start function set')
     print(customers.customers)
