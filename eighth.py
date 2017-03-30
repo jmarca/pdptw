@@ -163,23 +163,27 @@ class Customers():
         end_times = [None for o in dummy_time_windows]
         # Make random timedeltas, nominaly from the start of the day.
         for idx in range(1,num_custs+1):
+            # base time windows on destination, not origin
+            deliv_idx = idx+num_custs
             stime = int(np.random.random_integers(0, latest_time[idx]))
             start_times[idx] = timedelta(seconds=stime)
             end_times[idx] = (start_times[idx] +
-                               timedelta(seconds=int(pu_time_windows[idx])))
+                              timedelta(seconds=int(pu_time_windows[idx])))
             from_lat = lats[idx]
             from_lon = lons[idx]
             to_lat = lats[idx+num_custs]
             to_lon = lons[idx+num_custs]
-            od_dist = round( 1 + 1.1*self._haversine(from_lon,
-                                                     from_lat,
-                                                     to_lon,
-                                                     to_lat))
-            # add distance to start times to approximate real delivery time windows
-            dtime = stime + self.travel_time( od_dist )
-            start_times[idx+num_custs] = timedelta(seconds=dtime)
-            end_times[idx+num_custs] = (start_times[idx+num_custs] +
-                                           timedelta(seconds=int(pu_time_windows[idx])))
+            od_dist = round( self._haversine(from_lon,
+                                             from_lat,
+                                             to_lon,
+                                             to_lat))
+
+            # account for time to travel by growing window as needed
+            dtime = self.travel_time( od_dist )
+            start_times[deliv_idx] = start_times[idx] + timedelta(seconds=dtime)
+            end_times[deliv_idx] = end_times[idx] + timedelta(seconds=dtime)
+
+
 
         # A named tuple for the customer
         Customer = namedtuple("Customer", ['index',  # the index of the cust
@@ -365,7 +369,7 @@ class Customers():
 
         """
         def service_time_return(a, b):
-            return(self.customers[a].demand * self.service_time_per_dem)
+            return(abs(self.customers[a].demand * self.service_time_per_dem))
 
         return service_time_return
 
@@ -622,7 +626,7 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
 
 
 def main():
-    num_custs = 50
+    num_custs = 100
     # Create a set of customer, (and depot) custs.
     customers = Customers(num_custs=num_custs, min_demand=1,
                           max_demand=3, box_size=40,
@@ -643,7 +647,7 @@ def main():
         return serv_time_fn(a, b) + transit_time_fn(a, b)
 
     # Create a list of inhomgenious vehicle capacities as integer units.
-    capacity = [50, 75, 100, 125, 150, 175, 200, 250]
+    capacity = [50, 75, 100, 125, 150, 175, 200, 250, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4]
 
     # Create a list of inhomogenious fixed vehicle costs.
     cost = [int(100 + 2 * np.sqrt(c)) for c in capacity]
@@ -657,7 +661,7 @@ def main():
     # Set the starting nodes, and create a callback fn for the starting node.
     print(customers.customers)
     start_fn = vehicles.return_starting_callback(customers,
-                                                 sameStartFinish=False)
+                                                 sameStartFinish=True)
 
     print('start function set')
     print(customers.customers)
@@ -755,7 +759,7 @@ def main():
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
-            print('open: ' +str(cust.tw_open) +' close: '+str(cust.tw_close))
+            print('index: '+str(cust.index)+ ' open: ' +str(cust.tw_open) +' close: '+str(cust.tw_close))
             time_dimension.CumulVar(routing.NodeToIndex(cust.index)).SetRange(
                 cust.tw_open.seconds,
                 cust.tw_close.seconds)
@@ -766,10 +770,11 @@ def main():
     than the cost of servicing that customer, or it will always be dropped!
     """
     # To add disjunctions just to the customers, make a list of non-depots.
-    non_depot = set(range(customers.number))
+    non_depot = set(range(1,customers.number+1))
+
     non_depot.difference_update(vehicles.starts)
     non_depot.difference_update(vehicles.ends)
-    penalty = 400000  # The cost for dropping a node from the plan.
+    penalty = 400000000  # The cost for dropping a node from the plan.
     nodes = [routing.AddDisjunction([int(c)], penalty) for c in non_depot]
 
     # This is how you would implement partial routes if you already knew part
@@ -817,7 +822,7 @@ def main():
         ax.plot(clon, clat, 'k.')
         # plot the routes as arrows
         plot_vehicle_routes(vehicle_routes, ax, customers, vehicles)
-
+        fig.savefig("test.png")
     else:
         print('No assignment')
 
