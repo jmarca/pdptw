@@ -169,7 +169,7 @@ class Customers():
         latest_time = self.time_horizon - pu_time_windows - 6*3600 # not sure here, but lopping off 6 hrs seems to make things possible
         start_times = [None for o in range(0,2*num_custs+num_depots)]
         end_times = [None for o in range(0,2*num_custs+num_depots)]
-        hard_stop = timedelta(seconds=self.time_horizon)
+        hard_stop = timedelta(seconds=self.time_horizon - 600)
         # Make random timedeltas, nominaly from the start of the day.
         for idx in range(0,num_custs):
             # base time windows on destination, not origin
@@ -189,8 +189,8 @@ class Customers():
                                              to_lon,
                                              to_lat))
             dtime = self.travel_time( od_dist )
-            start_times[deliv_idx] = max(hard_stop,start_times[idx] + timedelta(seconds=dtime))
-            end_times[deliv_idx] = max(hard_stop,end_times[idx] + timedelta(seconds=dtime))
+            start_times[deliv_idx] = min(hard_stop,start_times[idx] + timedelta(seconds=dtime))
+            end_times[deliv_idx] = min(hard_stop,end_times[idx] + timedelta(seconds=dtime))
 
         print('done generating time windows at origins, destinations')
 
@@ -657,9 +657,9 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
 
 
 def main():
-    num_custs = 1000
-    num_vehicles = 250
-    num_depots = 50
+    num_custs = 100
+    num_vehicles = 25
+    num_depots = 5
     # Create a set of customer, (and depot) custs.
     customers = Customers(num_custs=num_custs, min_demand=1,
                           max_demand=3, box_size=40,
