@@ -80,6 +80,11 @@ class Customers():
 
             max_tw: longest random time window for a customer, in hours.
 
+            num_depots: the number of depots to create.  Default 10.
+
+            load_time: the time to load or unload one unit of demand, in
+                 seconds.  Default is 300 (5 minutes).
+
         Examples:
             To place 100 customers randomly within 100 km x 100 km rectangle,
             centered in the default location, with a random demand of between 5
@@ -100,9 +105,10 @@ class Customers():
     def __init__(self, extents=None, center=(53.381393, -1.474611),
                  box_size=10, num_custs=100,
                  min_demand=1, max_demand=5,
-                 min_tw=1, max_tw=5):
+                 min_tw=1, max_tw=5, num_depots=10, load_time=300):
 
-        self.number = 2*num_custs+1  #: The number of pickups, delivs + 1 depot
+        self.number = 2*num_custs+num_depots  #: The number of pickups, delivs, depots
+        self.depots = range(2*num_custs,self.number)
         #: Location, a named tuple for locations.
         Location = namedtuple("Location", ['lat', 'lon'])
         if extents is not None:
@@ -128,47 +134,51 @@ class Customers():
                                           (circ_earth *
                                            np.cos(np.deg2rad(clat)))),
                             'urcrnrlat': clat + 180 * box_size / circ_earth}
-        # The 'name' of the cust, indexed from 0 to num_custs-1
-        depot = np.array(range(0,1))
-        custs = np.array(range(1, num_custs+1))
+        # The 'name' of the cust.  Actually will be stops and depots
+        custs = np.array(range(0, num_custs))
         # The 'name' of the delivery, indexed from num_custs to 2*num_custs-1
-        delivs = np.array(range(num_custs+1,2*num_custs+1))
+        delivs = np.array(range(num_custs,2*num_custs))
+
+        depots = np.array(range(2*num_custs,2*num_custs + num_depots))
+
         # smush together
-        stops = np.concatenate((depot,custs,delivs))
+        stops = np.concatenate((custs,delivs,depots))
 
         # normaly distributed random distribution of custs and delivs within the box
         stdv = 6  # the number of standard deviations 99.9% will be within +-3
-        lats = (self.extents['llcrnrlat'] + np.random.randn(2*num_custs+1) *
+        lats = (self.extents['llcrnrlat'] +
+                np.random.randn(2*num_custs+num_depots) *
                 (self.extents['urcrnrlat'] - self.extents['llcrnrlat']) / stdv)
-        lons = (self.extents['llcrnrlon'] + np.random.randn(2*num_custs+1) *
+        lons = (self.extents['llcrnrlon'] +
+                np.random.randn(2*num_custs+num_depots) *
                 (self.extents['urcrnrlon'] - self.extents['llcrnrlon']) / stdv)
         # uniformly distributed integer demands.
-        depot_demands = np.array(range(0,1))
         cust_demands = np.random.randint(min_demand, max_demand, num_custs)
         # negative demands for deliveries
         cust_deliveries = -cust_demands
+        depot_demands = np.array([0 for i in range(0,num_depots)])
         # smush together
-        demands = np.concatenate((depot_demands,cust_demands,cust_deliveries))
+        demands = np.concatenate((cust_demands,cust_deliveries,depot_demands))
         self.time_horizon = 24 * 60 ** 2  # A 24 hour period.
 
         # The customers demand min_tw to max_tw hour time window for each
         # pickup
         pu_time_windows = np.random.random_integers(min_tw * 3600,
-                                                    max_tw * 3600, num_custs+1)
-        dummy_time_windows = np.random.random_integers(min_tw * 3600,
-                                                       max_tw * 3600, 2*num_custs+1)
+                                                    max_tw * 3600, num_custs)
         # The last time a pickup window can start
         latest_time = self.time_horizon - pu_time_windows - 6 * 3600 # arbitrary
-        start_times = [None for o in dummy_time_windows]
-        end_times = [None for o in dummy_time_windows]
+        start_times = [None for o in range(0,2*num_custs+num_depots)]
+        end_times = [None for o in range(0,2*num_custs+num_depots)]
         # Make random timedeltas, nominaly from the start of the day.
-        for idx in range(1,num_custs+1):
+        for idx in range(0,num_custs):
             # base time windows on destination, not origin
             deliv_idx = idx+num_custs
             stime = int(np.random.random_integers(0, latest_time[idx]))
             start_times[idx] = timedelta(seconds=stime)
             end_times[idx] = (start_times[idx] +
                               timedelta(seconds=int(pu_time_windows[idx])))
+
+            # account for time to travel by growing window as needed
             from_lat = lats[idx]
             from_lon = lons[idx]
             to_lat = lats[idx+num_custs]
@@ -177,8 +187,6 @@ class Customers():
                                              from_lat,
                                              to_lon,
                                              to_lat))
-
-            # account for time to travel by growing window as needed
             dtime = self.travel_time( od_dist )
             start_times[deliv_idx] = start_times[idx] + timedelta(seconds=dtime)
             end_times[deliv_idx] = end_times[idx] + timedelta(seconds=dtime)
@@ -199,7 +207,7 @@ class Customers():
                                  start_times, end_times)]
 
         # The number of seconds needed to 'unload' 1 unit of goods.
-        self.service_time_per_dem = 300  # seconds
+        self.service_time_per_dem = load_time  # seconds
 
     def central_start_node(self, invert=False):
         """
@@ -754,11 +762,11 @@ def main():
             # pickup index to deliveries
             deliv = customers.customers[cust.index+num_custs]
             deliv_index = routing.NodeToIndex(deliv.index)
-            print ('adding same vehicle constraint')
+            # print ('adding same vehicle constraint')
             solver.AddConstraint(
                 routing.VehicleVar(cust_index) == routing.VehicleVar(deliv_index))
 
-            print('adding less than, equal to constraint')
+            # print('adding less than, equal to constraint')
             solver.AddConstraint(
                 time_dimension.CumulVar(cust_index) <= time_dimension.CumulVar(deliv_index)
                     )
@@ -766,7 +774,7 @@ def main():
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
-            print('index: '+str(cust.index)+ ' open: ' +str(cust.tw_open) +' close: '+str(cust.tw_close))
+            print('index: '+str(cust.index)+ ' open: ' +str(cust.tw_open) +' close: '+str(cust.tw_close)+' demand:'+str(cust.demand))
             time_dimension.CumulVar(routing.NodeToIndex(cust.index)).SetRange(
                 cust.tw_open.seconds,
                 cust.tw_close.seconds)
@@ -777,10 +785,7 @@ def main():
     than the cost of servicing that customer, or it will always be dropped!
     """
     # To add disjunctions just to the customers, make a list of non-depots.
-    non_depot = set(range(1,customers.number+1))
-
-    non_depot.difference_update(vehicles.starts)
-    non_depot.difference_update(vehicles.ends)
+    non_depot = set([c.index for c in customers.customers if c.tw_open is not None])
     penalty = 400000000  # The cost for dropping a node from the plan.
     nodes = [routing.AddDisjunction([int(c)], penalty) for c in non_depot]
 
