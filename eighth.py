@@ -587,11 +587,16 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
 
     cmap = discrete_cmap(vehicles.number+2, 'nipy_spectral')
 
+
+
     for veh_number in veh_used:
 
-        lats, lons = zip(*[(c.lat, c.lon) for c in veh_route[veh_number]])
+        lats, lons, demands = zip(*[(c.lat, c.lon, c.demand) for c in veh_route[veh_number]])
         lats = np.array(lats)
         lons = np.array(lons)
+        pickup_lats, pickup_lons = zip(*[(lats[i],lons[i]) for i in range(0,len(lats)) if demands[i] > 0])
+        delivery_lats, delivery_lons = zip(*[(lats[i],lons[i]) for i in range(0,len(lats)) if demands[i] < 0])
+        sigil = ['v' if d > 0 else '^' for d in demands]
         s_dep = customers.customers[vehicles.starts[veh_number]]
         s_fin = customers.customers[vehicles.ends[veh_number]]
         ax1.annotate('v({veh}) S @ {node}'.format(
@@ -618,7 +623,9 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
                         connectionstyle="angle3,angleA=-90,angleB=0",
                         shrinkA=0.05),
                      )
-        ax1.plot(lons, lats, 'o', mfc=cmap(veh_number+1))
+        #ax1.plot(lons, lats, 'o', mfc=cmap(veh_number+1))
+        ax1.plot(pickup_lons, pickup_lats, '^', mfc=cmap(veh_number+1))
+        ax1.plot(delivery_lons, delivery_lats, 'v', mfc=cmap(veh_number+1))
         ax1.quiver(lons[:-1], lats[:-1],
                    lons[1:]-lons[:-1], lats[1:]-lats[:-1],
                    scale_units='xy', angles='xy', scale=1,
