@@ -273,10 +273,14 @@ class Customers():
                 if frm_idx != to_idx:
                     frm_c = self.customers[frm_idx]
                     to_c = self.customers[to_idx]
-                    self.distmat[frm_idx, to_idx] = self._haversine(frm_c.lon,
-                                                                    frm_c.lat,
-                                                                    to_c.lon,
-                                                                    to_c.lat)
+                    tripd = self._haversine(frm_c.lon,
+                                            frm_c.lat,
+                                            to_c.lon,
+                                            to_c.lat)
+                    if frm_c.demand == 0 or to_c.demand == 0:
+                        self.distmat[frm_idx, to_idx] = 0.1 * tripd
+                    else:
+                        self.distmat[frm_idx, to_idx] = tripd
         return(self.distmat)
 
     def _haversine(self, lon1, lat1, lon2, lat2):
