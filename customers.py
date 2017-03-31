@@ -1,7 +1,7 @@
 from collections import namedtuple
 import numpy as np
 from datetime import datetime, timedelta
-import spatial as genloc
+import spatial as spatial
 
 class Customers():
     """
@@ -103,7 +103,7 @@ class Customers():
         stops = np.concatenate((custs,delivs,depots))
 
         # normaly distributed random distribution of custs and delivs within the box
-        lats, lons = genloc.generate_locations (self.extents,2*num_custs + num_depots,6)
+        lats, lons = spatial.generate_locations (self.extents,2*num_custs + num_depots,6)
 
         # uniformly distributed integer demands.
         cust_demands = np.random.randint(min_demand, max_demand, num_custs)
@@ -137,7 +137,7 @@ class Customers():
             from_lon = lons[idx]
             to_lat = lats[idx+num_custs]
             to_lon = lons[idx+num_custs]
-            od_dist = round( self._haversine(from_lon,
+            od_dist = round( spatial.haversine(from_lon,
                                              from_lat,
                                              to_lon,
                                              to_lat))
@@ -182,7 +182,7 @@ class Customers():
         num_nodes = len(self.customers)
         dist = np.empty((num_nodes, 1))
         for idx_to in range(num_nodes):
-            dist[idx_to] = self._haversine(self.center.lon,
+            dist[idx_to] = spatial.haversine(self.center.lon,
                                            self.center.lat,
                                            self.customers[idx_to].lon,
                                            self.customers[idx_to].lat)
@@ -219,51 +219,23 @@ class Customers():
             AssertionError
         """
         self.distmat = np.zeros((self.number, self.number))
-        methods = {'haversine': self._haversine}
+        methods = {'haversine': spatial.haversine}
         assert(method in methods)
         for frm_idx in range(self.number):
             for to_idx in range(self.number):
                 if frm_idx != to_idx:
                     frm_c = self.customers[frm_idx]
                     to_c = self.customers[to_idx]
-                    tripd = self._haversine(frm_c.lon,
-                                            frm_c.lat,
-                                            to_c.lon,
-                                            to_c.lat)
+                    tripd = spatial.haversine(frm_c.lon,
+                                              frm_c.lat,
+                                              to_c.lon,
+                                              to_c.lat)
                     if frm_c.demand == 0 or to_c.demand == 0:
                         self.distmat[frm_idx, to_idx] = 0.1 * tripd
                     else:
                         self.distmat[frm_idx, to_idx] = tripd
         return(self.distmat)
 
-    def _haversine(self, lon1, lat1, lon2, lat2):
-        """
-        Calculate the great circle distance between two points
-        on the earth specified in decimal degrees of latitude and longitude.
-        https://en.wikipedia.org/wiki/Haversine_formula
-
-        Args:
-            lon1: longitude of pt 1,
-            lat1: latitude of pt 1,
-            lon2: longitude of pt 2,
-            lat2: latitude of pt 2
-
-        Returns:
-            the distace in km between pt1 and pt2
-        """
-        # convert decimal degrees to radians
-        lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
-
-        # haversine formula
-        dlon = lon2 - lon1
-        dlat = lat2 - lat1
-        a = (np.sin(dlat / 2) ** 2 + np.cos(lat1) *
-             np.cos(lat2) * np.sin(dlon / 2) ** 2)
-        c = 2 * np.arcsin(np.sqrt(a))
-
-        # 6367 km is the radius of the Earth
-        km = 6367 * c
-        return km
 
     def get_total_demand(self):
         """
