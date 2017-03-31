@@ -199,43 +199,6 @@ class Customers():
                                       p=prob.flatten())
         return start_node[0]
 
-    def make_distance_mat(self, method='haversine'):
-        """
-        Return a distance matrix and make it a member of Customer, using the
-        method given in the call. Currently only Haversine (GC distance) is
-        implemented, but Manhattan, or using a maps API could be added here.
-        Raises an AssertionError for all other methods.
-
-        Args:
-            method (Optional[str]): method of distance calculation to use. The
-                Haversine formula is the only method implemented.
-
-        Returns:
-            Numpy array of node to node distances.
-
-        Examples:
-            >>> dist_mat = customers.make_distance_mat(method='haversine')
-            >>> dist_mat = customers.make_distance_mat(method='manhattan')
-            AssertionError
-        """
-        self.distmat = np.zeros((self.number, self.number))
-        methods = {'haversine': spatial.haversine}
-        assert(method in methods)
-        for frm_idx in range(self.number):
-            for to_idx in range(self.number):
-                if frm_idx != to_idx:
-                    frm_c = self.customers[frm_idx]
-                    to_c = self.customers[to_idx]
-                    tripd = spatial.haversine(frm_c.lon,
-                                              frm_c.lat,
-                                              to_c.lon,
-                                              to_c.lat)
-                    if frm_c.demand == 0 or to_c.demand == 0:
-                        self.distmat[frm_idx, to_idx] = 0.1 * tripd
-                    else:
-                        self.distmat[frm_idx, to_idx] = tripd
-        return(self.distmat)
-
 
     def get_total_demand(self):
         """
@@ -255,8 +218,10 @@ class Customers():
             function: dist_return(a,b) A function that takes the 'from' node
                 index and the 'to' node index and returns the distance in km.
         """
-        self.make_distance_mat(**kwargs)
-
+        print('generatng distmat')
+        self.distmat = spatial.make_distance_mat(self.customers,**kwargs)
+        print('done with distmat')
+        print(self.distmat)
         def dist_return(a, b): return(self.distmat[a][b])
 
         return dist_return

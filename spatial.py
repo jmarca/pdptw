@@ -1,4 +1,6 @@
 import numpy as np
+from multiprocessing import Pool
+from itertools import combinations
 
 def generate_locations( extents, num, stddev = 6 ):
     """
@@ -56,3 +58,60 @@ def haversine(lon1, lat1, lon2, lat2):
     # 6367 km is the radius of the Earth
     km = 6367 * c
     return km
+
+def f(paired_indices):
+    a,b = paired_indices
+    alat,alon = a
+    blat,blon = b
+    tripd = haversine(alon,
+                      alat,
+                      blon,
+                      blat)
+    return tripd
+
+def make_distance_mat(customers, method='haversine'):
+    """
+    Return a distance matrix and make it a member of Customer, using the
+    method given in the call. Currently only Haversine (GC distance) is
+    implemented, but Manhattan, or using a maps API could be added here.
+    Raises an AssertionError for all other methods.
+
+    Args:
+        method (Optional[str]): method of distance calculation to use. The
+            Haversine formula is the only method implemented.
+
+    Returns:
+        Numpy array of node to node distances.
+
+    Examples:
+        >>> dist_mat = customers.make_distance_mat(method='haversine')
+        >>> dist_mat = customers.make_distance_mat(method='manhattan')
+    AssertionError
+    """
+    number = len(customers)
+    distmat = np.zeros((number, number))
+    methods = {'haversine': haversine}
+    assert(method in methods)
+
+
+    def g(paired_indices,tripd):
+        # print(paired_indices,tripd)
+        frm_idx,to_idx = paired_indices
+
+        if customers[frm_idx].demand == 0 or customers[to_idx].demand == 0:
+            distmat[frm_idx, to_idx] = 0.1 * tripd
+            distmat[to_idx, frm_idx] = 0.1 * tripd
+        else:
+            distmat[frm_idx, to_idx] = tripd
+            distmat[to_idx, frm_idx] = tripd
+
+
+
+    p = Pool(4)
+    distances = p.map(f,combinations(((c.lat,c.lon) for c in customers),2))
+    for i in map (g,combinations(range(number),2),distances):
+        next
+
+    # print (distmat)
+    # print (1/0)
+    return distmat
