@@ -1,6 +1,7 @@
 from collections import namedtuple
 import numpy as np
 from datetime import datetime, timedelta
+import spatial as genloc
 
 class Customers():
     """
@@ -83,14 +84,14 @@ class Customers():
             rad_earth = 6367  # km
             circ_earth = np.pi * rad_earth
             #: The lower left and upper right points
-            self.extents = {'llcrnrlon': (clon - 180 * box_size /
+            self.extents = {'lllon': (clon - 180 * box_size /
                                           (circ_earth *
                                            np.cos(np.deg2rad(clat)))),
-                            'llcrnrlat': clat - 180 * box_size / circ_earth,
-                            'urcrnrlon': (clon + 180 * box_size /
+                            'lllat': clat - 180 * box_size / circ_earth,
+                            'urlon': (clon + 180 * box_size /
                                           (circ_earth *
                                            np.cos(np.deg2rad(clat)))),
-                            'urcrnrlat': clat + 180 * box_size / circ_earth}
+                            'urlat': clat + 180 * box_size / circ_earth}
         # The 'name' of the cust.  Actually will be stops and depots
         custs = np.array(range(0, num_custs))
         # The 'name' of the delivery, indexed from num_custs to 2*num_custs-1
@@ -102,13 +103,8 @@ class Customers():
         stops = np.concatenate((custs,delivs,depots))
 
         # normaly distributed random distribution of custs and delivs within the box
-        stdv = 6  # the number of standard deviations 99.9% will be within +-3
-        lats = (self.extents['llcrnrlat'] +
-                np.random.randn(2*num_custs+num_depots) *
-                (self.extents['urcrnrlat'] - self.extents['llcrnrlat']) / stdv)
-        lons = (self.extents['llcrnrlon'] +
-                np.random.randn(2*num_custs+num_depots) *
-                (self.extents['urcrnrlon'] - self.extents['llcrnrlon']) / stdv)
+        lats, lons = genloc.generate_locations (self.extents,2*num_custs + num_depots,6)
+
         # uniformly distributed integer demands.
         cust_demands = np.random.randint(min_demand, max_demand, num_custs)
         # negative demands for deliveries
