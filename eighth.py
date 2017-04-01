@@ -289,7 +289,7 @@ def main():
     # Routing: forbids use of TSPOpt neighborhood,
     parameters.local_search_operators.use_tsp_opt = False
 
-    parameters.time_limit_ms = 2 * 60 * 1000  # 2 minutes
+    parameters.time_limit_ms = 20 * 60 * 1000  # 20 minutes
     parameters.use_light_propagation = False
     # parameters.log_search = True
 
