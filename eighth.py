@@ -44,172 +44,8 @@ from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2
 import customers as cu
 import vehicles as ve
-
-
-def discrete_cmap(N, base_cmap=None):
-    """
-    Create an N-bin discrete colormap from the specified input map
-    """
-    # Note that if base_cmap is a string or None, you can simply do
-    #    return plt.cm.get_cmap(base_cmap, N)
-    # The following works for string, None, or a colormap instance:
-
-    base = plt.cm.get_cmap(base_cmap)
-    color_list = base(np.linspace(0, 1, N))
-    cmap_name = base.name + str(N)
-    return base.from_list(cmap_name, color_list, N)
-
-
-def vehicle_output_string(routing, plan, n, num_custs):
-    """
-    Return a string displaying the output of the routing instance and
-    assignment (plan).
-
-    Args:
-        routing (ortools.constraint_solver.pywrapcp.RoutingModel): routing.
-
-        plan (ortools.constraint_solver.pywrapcp.Assignment): the assignment.
-    Returns:
-        (string) plan_output: describing each vehicle's plan.
-
-        (List) dropped: list of dropped orders.
-
-    """
-    dropped = []
-    for order in range(routing.Size()):
-        if (plan.Value(routing.NextVar(order)) == order):
-            dropped.append(str(order))
-
-    capacity_dimension = routing.GetDimensionOrDie("Capacity")
-    time_dimension = routing.GetDimensionOrDie("Time")
-    plan_output = ''
-
-    for route_number in range(routing.vehicles()):
-        order = routing.Start(route_number)
-        plan_output += 'Route {0}:'.format(route_number)
-        if routing.IsEnd(plan.Value(routing.NextVar(order))):
-            plan_output += ' Empty \n'
-        else:
-            while True:
-                load_var = capacity_dimension.CumulVar(order)
-                time_var = time_dimension.CumulVar(order)
-                plan_output += \
-                    " {what} {cust} [{order}] Load({load}) Time({tmin}, {tmax}) -> ".format(
-                        cust=(order%n),
-                        order = order,
-                        what=("Pickup" if order < n else 
-                              "Return Pickup" if order >= n and order < 2*n else 
-                              "Delivery" if order >= num_custs and order < (num_custs+n) else
-                              "Return Delivery" if order < 2*num_custs else
-                              "Depot"
-                          ),
-                        load=plan.Value(load_var),
-                        tmin=str(timedelta(seconds=plan.Min(time_var))),
-                        tmax=str(timedelta(seconds=plan.Max(time_var))))
-
-                if routing.IsEnd(order):
-                    plan_output += ' EndRoute {0}. \n'.format(route_number)
-                    break
-                order = plan.Value(routing.NextVar(order))
-        plan_output += "\n"
-
-    return(plan_output, dropped)
-
-
-def build_vehicle_route(routing, plan, customers, veh_number):
-    """
-    Build a route for a vehicle by starting at the strat node and
-    continuing to the end node.
-
-    Args:
-        routing (ortools.constraint_solver.pywrapcp.RoutingModel): routing.
-
-        plan (ortools.constraint_solver.pywrapcp.Assignment): the assignment.
-
-        customers (Customers): the customers instance.
-
-        veh_number (int): index of the vehicle
-    Returns:
-        (List) route: indexes of the customers for vehicle veh_number
-    """
-    veh_used = routing.IsVehicleUsed(plan, veh_number)
-    print('Vehicle {0} is used {1}'.format(veh_number, veh_used))
-    if veh_used:
-        route = []
-        node = routing.Start(veh_number)  # Get the starting node index
-        route.append(customers.customers[routing.IndexToNode(node)])
-        while not routing.IsEnd(node):
-            route.append(customers.customers[routing.IndexToNode(node)])
-            node = plan.Value(routing.NextVar(node))
-
-        route.append(customers.customers[routing.IndexToNode(node)])
-        return route
-    else:
-        return None
-
-
-def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
-    """
-    Plot the vehicle routes on matplotlib axis ax1.
-
-    Args:
-        veh_route (dict): a dictionary of routes keyed by vehicle idx.
-
-        ax1 (matplotlib.axes._subplots.AxesSubplot): Matplotlib axes
-
-        customers (Customers): the customers instance.
-
-        vehicles (Vehicles): the vehicles instance.
-    """
-    veh_used = [v for v in veh_route if veh_route[v] is not None]
-
-    cmap = discrete_cmap(vehicles.number+2, 'nipy_spectral')
-
-
-
-    for veh_number in veh_used:
-
-        lats, lons, demands = zip(*[(c.lat, c.lon, c.demand) for c in veh_route[veh_number]])
-        lats = np.array(lats)
-        lons = np.array(lons)
-        pickup_lats, pickup_lons = zip(*[(lats[i],lons[i]) for i in range(0,len(lats)) if demands[i] > 0])
-        delivery_lats, delivery_lons = zip(*[(lats[i],lons[i]) for i in range(0,len(lats)) if demands[i] < 0])
-        sigil = ['v' if d > 0 else '^' for d in demands]
-        s_dep = customers.customers[vehicles.starts[veh_number]]
-        s_fin = customers.customers[vehicles.ends[veh_number]]
-        ax1.annotate('v({veh}) S @ {node}'.format(
-                        veh=veh_number,
-                        node=vehicles.starts[veh_number]),
-                     xy=(s_dep.lon, s_dep.lat),
-                     xytext=(10, 10),
-                     xycoords='data',
-                     textcoords='offset points',
-                     arrowprops=dict(
-                        arrowstyle="->",
-                        connectionstyle="angle3,angleA=90,angleB=0",
-                        shrinkA=0.05),
-                     )
-        ax1.annotate('v({veh}) F @ {node}'.format(
-                        veh=veh_number,
-                        node=vehicles.ends[veh_number]),
-                     xy=(s_fin.lon, s_fin.lat),
-                     xytext=(10, -20),
-                     xycoords='data',
-                     textcoords='offset points',
-                     arrowprops=dict(
-                        arrowstyle="->",
-                        connectionstyle="angle3,angleA=-90,angleB=0",
-                        shrinkA=0.05),
-                     )
-        #ax1.plot(lons, lats, 'o', mfc=cmap(veh_number+1))
-        ax1.plot(pickup_lons, pickup_lats, '^', mfc=cmap(veh_number+1))
-        ax1.plot(delivery_lons, delivery_lats, 'v', mfc=cmap(veh_number+1))
-        ax1.quiver(lons[:-1], lats[:-1],
-                   lons[1:]-lons[:-1], lats[1:]-lats[:-1],
-                   scale_units='xy', angles='xy', scale=1,
-                   color=cmap(veh_number+1))
-
-
+import plot as pl
+import veh_output as vo
 import argparse
 
 def main():
@@ -247,14 +83,14 @@ def main():
     num_vehicles = args.v
 
     # Create a set of customer, (and depot) custs.
-    customers = cu.Customers(n=n, 
+    customers = cu.Customers(n=n,
                              min_demand=args.min_demand,
-                             max_demand=args.max_demand, 
+                             max_demand=args.max_demand,
                              box_size=args.box_size,
-                             min_tw=args.min_tw, 
-                             max_tw=args.max_tw, 
+                             min_tw=args.min_tw,
+                             max_tw=args.max_tw,
                              num_depots=args.d,
-                             load_time=args.load_time, 
+                             load_time=args.load_time,
                              return_pu_win=args.return_pu_win,
                              avg_speed=args.avg_speed,
                              earliest_start=args.earliest_start)
@@ -316,8 +152,8 @@ def main():
     print('calling routing model')
     print('customers.number '+str(customers.number)) # int number
     print('vehicles.number '+ str(vehicles.number))  # int number
-    print('vehicles.starts '+ str(vehicles.starts))  # List of int start depot
-    print('vehicles.ends '  + str(vehicles.ends))    # List of int end depot
+    # print('vehicles.starts '+ str(vehicles.starts))  # List of int start depot
+    # print('vehicles.ends '  + str(vehicles.ends))    # List of int end depot
     print('model_parameters ')
     print(model_parameters )
 
@@ -338,7 +174,7 @@ def main():
     # Routing: forbids use of TSPOpt neighborhood,
     parameters.local_search_operators.use_tsp_opt = False
 
-    parameters.time_limit_ms = 20 * 60 * 1000  # 20 minutes
+    parameters.time_limit_ms = 40 * 60 * 1000  # 40 minutes
     parameters.use_light_propagation = False
     # parameters.log_search = True
 
@@ -407,13 +243,13 @@ def main():
         if cust.tw_open is not None:
             print('index: '+str(cust.index)
                   +" "
-                  +("Pickup" if cust.index < n else 
-                    "Return Pickup" if cust.index >= n and cust.index < 2*n else 
+                  +("Pickup" if cust.index < n else
+                    "Return Pickup" if cust.index >= n and cust.index < 2*n else
                     "Delivery" if cust.index >= num_custs and cust.index < (num_custs+n) else
                     "Return Delivery" if cust.index < 2*num_custs else
                     "Depot")
                   +" "+str(cust.index%n)
-                  + ' open: ' +str(cust.tw_open) + 
+                  + ' open: ' +str(cust.tw_open) +
                   (' ttime({fr}->{to}):{ttime}'.format(
                       fr=routing.NodeToIndex(cust.index),
                       to=routing.NodeToIndex(cust.index+num_custs),
@@ -432,7 +268,7 @@ def main():
     """
     # To add disjunctions just to the customers, make a list of non-depots.
     non_depot = set([c.index for c in customers.customers if c.tw_open is not None])
-    penalty = 400000000  # The cost for dropping a node from the plan.
+    penalty = 1000000  # The cost for dropping a node from the plan.
     nodes = [routing.AddDisjunction([int(c)], penalty) for c in non_depot]
 
     # This is how you would implement partial routes if you already knew part
@@ -458,9 +294,11 @@ def main():
             print('succesfully wrote assignment to file ' +
                   save_file_base + '_assignment.ass')
 
-        print('The Objective Value is {0}'.format(assignment.ObjectiveValue()))
+        plan_output, dropped = vo.vehicle_output_string(routing, assignment)
 
-        plan_output, dropped = vehicle_output_string(routing, assignment, n, num_custs)
+        print('The Objective Value is {0}'.format(assignment.ObjectiveValue()))
+        print('The cumulative distance cost is {0}'.format(assignment.ObjectiveValue() - len(dropped)*penalty))
+
         print(plan_output)
         print('dropped nodes: ' + ', '.join(dropped))
 
@@ -469,7 +307,7 @@ def main():
 
         vehicle_routes = {}
         for veh in range(vehicles.number):
-            vehicle_routes[veh] = build_vehicle_route(routing, assignment,
+            vehicle_routes[veh] = vo.build_vehicle_route(routing, assignment,
                                                       customers, veh)
 
         # Plotting of the routes in matplotlib.
@@ -479,7 +317,7 @@ def main():
         clon, clat = zip(*[(c.lon, c.lat) for c in customers.customers])
         ax.plot(clon, clat, 'k.')
         # plot the routes as arrows
-        plot_vehicle_routes(vehicle_routes, ax, customers, vehicles)
+        pl.plot_vehicle_routes(vehicle_routes, ax, customers, vehicles)
         fig.savefig("test.png",dpi=900)
     else:
         print('No assignment')
