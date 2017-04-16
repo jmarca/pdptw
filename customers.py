@@ -173,9 +173,9 @@ class Customers():
             dtime_in = self.travel_time( od_dist_in, speed_kmph=avg_speed )
 
             # time window for delivery.  should be travel time plus some error (say 25%)
-            start_times[deliv_idx] = start_times[idx] + timedelta(seconds=dtime_out)  # earliest pickup plus travel time
-            print('stdi',deliv_idx,str(start_times[idx]),str(timedelta(seconds=dtime_out)),str(start_times[deliv_idx]))
-            end_times[deliv_idx] = end_times[idx] + timedelta(seconds=(1.25*float(dtime_out))) # latest pickup plus 1.25 times travel time
+            start_times[deliv_idx] = start_times[idx] + timedelta(seconds=(load_time*cust_demands[idx]+dtime_out))  # earliest pickup plus travel time
+            #print('stdi',deliv_idx,str(start_times[idx]),str(timedelta(seconds=dtime_out)),str(start_times[deliv_idx]))
+            end_times[deliv_idx] = end_times[idx] + timedelta(seconds=(load_time*cust_demands[idx]+1.25*float(dtime_out))) # latest pickup plus 1.25 times travel time
 
             # time windows can't be any later than hard_stop
 #            start_times[idx] = min(hard_stop,start_times[idx] + timedelta(seconds=dtime_out)
@@ -198,10 +198,10 @@ class Customers():
 
             deliv_idx_in = idx+n+num_custs
             start_times[deliv_idx_in] = (start_times[idx_in] +          # earliest return pickup time plus travel time
-                                         timedelta(seconds=(dtime_in))) # travel time 
+                                         timedelta(seconds=(load_time*cust_demands[idx]+dtime_in))) # travel time 
             #print('stdii',deliv_idx_in,str(start_times[idx_in]),str(timedelta(seconds=dtime_in)),str(start_times[deliv_idx_in]))
             end_times[deliv_idx_in] = (end_times[idx_in] +
-                                       timedelta(seconds=(1.25*float(dtime_in))))  # latest return pickup time plus 1.25% of travel time
+                                       timedelta(seconds=(load_time*cust_demands[idx]+1.25*float(dtime_in))))  # latest return pickup time plus 1.25% of travel time
         print('done generating time windows at origins, destinations')
 
         # A named tuple for the customer
