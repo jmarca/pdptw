@@ -60,7 +60,7 @@ def discrete_cmap(N, base_cmap=None):
     return base.from_list(cmap_name, color_list, N)
 
 
-def vehicle_output_string(routing, plan):
+def vehicle_output_string(routing, plan, n, num_custs):
     """
     Return a string displaying the output of the routing instance and
     assignment (plan).
@@ -94,8 +94,15 @@ def vehicle_output_string(routing, plan):
                 load_var = capacity_dimension.CumulVar(order)
                 time_var = time_dimension.CumulVar(order)
                 plan_output += \
-                    " {order} Load({load}) Time({tmin}, {tmax}) -> ".format(
-                        order=order,
+                    " {what} {cust} [{order}] Load({load}) Time({tmin}, {tmax}) -> ".format(
+                        cust=(order%n),
+                        order = order,
+                        what=("Pickup" if order < n else 
+                              "Return Pickup" if order >= n and order < 2*n else 
+                              "Delivery" if order >= num_custs and order < (num_custs+n) else
+                              "Return Delivery" if order < 2*num_custs else
+                              "Depot"
+                          ),
                         load=plan.Value(load_var),
                         tmin=str(timedelta(seconds=plan.Min(time_var))),
                         tmax=str(timedelta(seconds=plan.Max(time_var))))
@@ -218,18 +225,36 @@ def main():
                         help='Minimum demand per customer')
     parser.add_argument('--max-demand', type=int, dest='max_demand',default=3,
                         help='Maximum demand per customer')
+    parser.add_argument('--min-tw', type=float, dest='min_tw',default=1,
+                        help='Minimum time window')
+    parser.add_argument('--max-tw', type=float, dest='max_tw',default=3,
+                        help='Maximum time window')
+    parser.add_argument('--box-size', type=float, dest='box_size',default=40,
+                        help='Box size (km)')
+    parser.add_argument('--load-time', type=int, dest='load_time',default=300,
+                        help='Load time/unit of demand (s)')
+    parser.add_argument('--return-pu-win', type=int, dest='return_pu_win',default=5,
+                        help='size of time window for return pickup (minutes)')
+    parser.add_argument('--avg-speed', type=int, dest='avg_speed',default=50,
+                        help='Avg speed of vehicles (km/h)')
 
     args = parser.parse_args()
 
     n = args.n
     num_custs = 2*n
     num_vehicles = args.v
-    num_depots = args.d
 
     # Create a set of customer, (and depot) custs.
-    customers = cu.Customers(n=n, min_demand=args.min_demand,
-                          max_demand=args.max_demand, box_size=40,
-                          min_tw=1, max_tw=3, num_depots=num_depots)
+    customers = cu.Customers(n=n, 
+                             min_demand=args.min_demand,
+                             max_demand=args.max_demand, 
+                             box_size=args.box_size,
+                             min_tw=args.min_tw, 
+                             max_tw=args.max_tw, 
+                             num_depots=args.d,
+                             load_time=args.load_time, 
+                             return_pu_win=args.return_pu_win,
+                             avg_speed=args.avg_speed)
     print ('customers created')
     # print(customers.customers)
 
@@ -239,7 +264,7 @@ def main():
     dem_fn = customers.return_dem_callback()
     print('demand callback done')
     serv_time_fn = customers.make_service_time_call_callback()
-    transit_time_fn = customers.make_transit_time_callback()
+    transit_time_fn = customers.make_transit_time_callback(speed_kmph=args.avg_speed)
 
     def tot_time_fn(a, b):
         """
@@ -368,7 +393,22 @@ def main():
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
-            print('index: '+str(cust.index)+ ' open: ' +str(cust.tw_open) +' close: '+str(cust.tw_close)+' demand:'+str(cust.demand))
+            print('index: '+str(cust.index)
+                  +" "
+                  +("Pickup" if cust.index < n else 
+                    "Return Pickup" if cust.index >= n and cust.index < 2*n else 
+                    "Delivery" if cust.index >= num_custs and cust.index < (num_custs+n) else
+                    "Return Delivery" if cust.index < 2*num_custs else
+                    "Depot")
+                  +" "+str(cust.index%n)
+                  + ' open: ' +str(cust.tw_open) + 
+                  (' ttime({fr}->{to}):{ttime}'.format(
+                      fr=routing.NodeToIndex(cust.index),
+                      to=routing.NodeToIndex(cust.index+num_custs),
+                      ttime=str(timedelta(seconds=transit_time_fn(routing.NodeToIndex(cust.index),
+                                                                  routing.NodeToIndex(cust.index+num_custs))))
+                  ) if cust.index < 2*n else "")+
+                  ' close: '+str(cust.tw_close)+' demand:'+str(cust.demand))
             time_dimension.CumulVar(routing.NodeToIndex(cust.index)).SetRange(
                 cust.tw_open.seconds,
                 cust.tw_close.seconds)
@@ -408,7 +448,7 @@ def main():
 
         print('The Objective Value is {0}'.format(assignment.ObjectiveValue()))
 
-        plan_output, dropped = vehicle_output_string(routing, assignment)
+        plan_output, dropped = vehicle_output_string(routing, assignment, n, num_custs)
         print(plan_output)
         print('dropped nodes: ' + ', '.join(dropped))
 

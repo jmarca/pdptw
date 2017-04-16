@@ -63,8 +63,11 @@ class Customers():
     def __init__(self, extents=None, center=(53.381393, -1.474611),
                  box_size=10, n=100,
                  min_demand=1, max_demand=5,
-                 min_tw=1, max_tw=5, num_depots=10, load_time=300):
+                 min_tw=1, max_tw=5, num_depots=10, load_time=300, 
+                 return_pu_win=5,
+                 avg_speed=50):
 
+        # the number of customer trips is 2 * the number of custs (n).
         num_custs = 2*n
 
         self.number = 2*num_custs+num_depots  #: The number of pickups, delivs, depots
@@ -146,6 +149,8 @@ class Customers():
             # base time windows on destination, not origin
             deliv_idx = idx+num_custs
             stime = int(np.random.random_integers(0, latest_time[idx]))
+
+            # time window for pickup
             start_times[idx] = timedelta(seconds=stime)
             end_times[idx] = (start_times[idx] +
                               timedelta(seconds=int(pu_time_windows_out[idx])))
@@ -159,28 +164,44 @@ class Customers():
                                              from_lat,
                                              to_lon,
                                              to_lat))
-            dtime_out = self.travel_time( od_dist_out )
+            dtime_out = self.travel_time( od_dist_out, speed_kmph=avg_speed )
 
             od_dist_in = round( spatial.haversine(to_lon,
                                              to_lat,
                                              from_lon,
                                              from_lat))
-            dtime_in = self.travel_time( od_dist_in )
+            dtime_in = self.travel_time( od_dist_in, speed_kmph=avg_speed )
 
-            # adjust to account for return trip
-            start_times[deliv_idx] = min(hard_stop,start_times[idx] + timedelta(seconds=dtime_out)
-                                         + timedelta(seconds=(2 * load_time * cust_demands[idx])) + timedelta(seconds=1800) + timedelta(seconds=dtime_in) )  # 1800 is time window for return pickup
-            end_times[deliv_idx] = min(hard_stop,end_times[idx] + timedelta(seconds=dtime_out)
-                                         + timedelta(seconds=(2 * load_time * cust_demands[idx])) + timedelta(seconds=1800) + timedelta(seconds=dtime_in) )  # 1800 is time window for return pickup
+            # time window for delivery.  should be travel time plus some error (say 25%)
+            start_times[deliv_idx] = start_times[idx] + timedelta(seconds=dtime_out)  # earliest pickup plus travel time
+            print('stdi',deliv_idx,str(start_times[idx]),str(timedelta(seconds=dtime_out)),str(start_times[deliv_idx]))
+            end_times[deliv_idx] = end_times[idx] + timedelta(seconds=(1.25*float(dtime_out))) # latest pickup plus 1.25 times travel time
+
+            # time windows can't be any later than hard_stop
+#            start_times[idx] = min(hard_stop,start_times[idx] + timedelta(seconds=dtime_out)
+#                                   + timedelta(seconds=(2 * load_time * cust_demands[idx])) )
+#            end_times[idx] = min(hard_stop,end_times[idx] + timedelta(seconds=dtime_out)
+#                                 + timedelta(seconds=(2 * load_time * cust_demands[idx])) + timedelta(seconds=1800) )
 
             # return trip time window will be latest delivery time (end of pickup window + dtime + "activity time"
             # "activity time" a constant for now (say 60 minutes), but should probably be a random variable
+            activity_time = 1*3600
             idx_in = idx+n
-            deliv_idx_in = idx+n+num_custs
-            stime_in = end_times[deliv_idx] + timedelta(seconds=(1 * 3600)) # FIXED time of 1 hr after latest delivery
+
+            # Earliest start time of return pickup should be end_time of delivery plus activity time
+            stime_in = end_times[deliv_idx] + timedelta(seconds=activity_time) 
             start_times[idx_in] = stime_in
+
+            # latest end time of return pickup should be return_pu_win minutes past the start time
             end_times[idx_in] = (start_times[idx_in] +
-                                 timedelta(seconds=(1800 + dtime_in)))  # assume tight time window (30 minutes plus travel time) for return
+                                 timedelta(seconds=(return_pu_win*60)))  # assume tight time window of 5 minutes after end of activity
+
+            deliv_idx_in = idx+n+num_custs
+            start_times[deliv_idx_in] = (start_times[idx_in] +          # earliest return pickup time plus travel time
+                                         timedelta(seconds=(dtime_in))) # travel time 
+            #print('stdii',deliv_idx_in,str(start_times[idx_in]),str(timedelta(seconds=dtime_in)),str(start_times[deliv_idx_in]))
+            end_times[deliv_idx_in] = (end_times[idx_in] +
+                                       timedelta(seconds=(1.25*float(dtime_in))))  # latest return pickup time plus 1.25% of travel time
         print('done generating time windows at origins, destinations')
 
         # A named tuple for the customer
@@ -314,7 +335,7 @@ class Customers():
 
         return service_time_return
 
-    def travel_time (self, distance, speed_kmph=10):
+    def travel_time (self, distance, speed_kmph=50):
         """
         Creates a callback function for transit time. Assuming an average
         speed of speed_kmph
@@ -325,7 +346,7 @@ class Customers():
         """
         return (distance / (speed_kmph * 1.0 / 60 ** 2))
 
-    def make_transit_time_callback(self, speed_kmph=10):
+    def make_transit_time_callback(self, speed_kmph=50):
         """
         Creates a callback function for transit time. Assuming an average
         speed of speed_kmph
