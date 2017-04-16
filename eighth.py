@@ -203,13 +203,32 @@ def plot_vehicle_routes(veh_route, ax1, customers, vehicles):
                    color=cmap(veh_number+1))
 
 
+import argparse
+
 def main():
-    num_custs = 100
-    num_vehicles = 30
-    num_depots = 2
+
+    parser = argparse.ArgumentParser(description='Solve the PDPTW for round trips.')
+    parser.add_argument('-n,--number', type=int, dest='n',default=100,
+                        help='Number of round trip customers to generate')
+    parser.add_argument('-v,--vehicles', type=int, dest='v',default=30,
+                        help='Number of vehicles')
+    parser.add_argument('-d,--depots', type=int, dest='d',default=2,
+                        help='Number of depots')
+    parser.add_argument('--min-demand', type=int, dest='min_demand',default=1,
+                        help='Minimum demand per customer')
+    parser.add_argument('--max-demand', type=int, dest='max_demand',default=3,
+                        help='Maximum demand per customer')
+
+    args = parser.parse_args()
+
+    n = args.n
+    num_custs = 2*n
+    num_vehicles = args.v
+    num_depots = args.d
+
     # Create a set of customer, (and depot) custs.
-    customers = cu.Customers(num_custs=num_custs, min_demand=1,
-                          max_demand=3, box_size=40,
+    customers = cu.Customers(n=n, min_demand=args.min_demand,
+                          max_demand=args.max_demand, box_size=40,
                           min_tw=1, max_tw=3, num_depots=num_depots)
     print ('customers created')
     # print(customers.customers)
@@ -252,7 +271,9 @@ def main():
                                                  sameStartFinish=True)
 
     print('start function set')
-    print(customers.customers)
+    for idx in range(0,n):
+        print customers.customers[idx],"->\n\t",customers.customers[idx+num_custs]
+        print "RETURN",customers.customers[idx+n],"->\n\t",customers.customers[idx+n+num_custs]
 
     # Set model parameters
     model_parameters = pywrapcp.RoutingModel.DefaultModelParameters()

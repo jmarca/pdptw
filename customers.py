@@ -61,9 +61,11 @@ class Customers():
 
     """
     def __init__(self, extents=None, center=(53.381393, -1.474611),
-                 box_size=10, num_custs=100,
+                 box_size=10, n=100,
                  min_demand=1, max_demand=5,
                  min_tw=1, max_tw=5, num_depots=10, load_time=300):
+
+        num_custs = 2*n
 
         self.number = 2*num_custs+num_depots  #: The number of pickups, delivs, depots
         self.depots = range(2*num_custs,self.number)
@@ -103,10 +105,24 @@ class Customers():
         stops = np.concatenate((custs,delivs,depots))
 
         # normaly distributed random distribution of custs and delivs within the box
-        lats, lons = spatial.generate_locations (self.extents,2*num_custs + num_depots,6)
+        lats_out_orig, lons_out_orig = spatial.generate_locations (self.extents,n,6)
+        lats_out_dest, lons_out_dest = spatial.generate_locations (self.extents,n,6)
+        lats_in_orig = np.copy(lats_out_dest)
+        lons_in_orig = np.copy(lons_out_dest)
+        lats_in_dest = np.copy(lats_out_orig)
+        lons_in_dest = np.copy(lons_out_orig)
+        lats_dep, lons_dep = spatial.generate_locations (self.extents,num_depots,6)
+        lats = np.concatenate((lats_out_orig,lats_out_dest,lats_in_orig,lats_in_dest,lats_dep))
+        lons = np.concatenate((lons_out_orig,lons_out_dest,lons_in_orig,lons_in_dest,lons_dep))
 
         # uniformly distributed integer demands.
-        cust_demands = np.random.randint(min_demand, max_demand, num_custs)
+        cust_demands_out = np.random.randint(min_demand, max_demand, n)
+
+        # assume all trips out require a return trip with the same demand as the out trip
+        cust_demands_in = np.copy(cust_demands_out)
+
+        cust_demands = np.concatenate((cust_demands_out,cust_demands_in))
+
         # negative demands for deliveries
         cust_deliveries = -cust_demands
         depot_demands = np.array([0 for i in range(0,num_depots)])
@@ -115,36 +131,56 @@ class Customers():
         self.time_horizon = 24 * 60 ** 2  # A 24 hour period.
 
         # The customers demand min_tw to max_tw hour time window for each
-        # pickup
-        pu_time_windows = np.random.random_integers(min_tw * 3600,
-                                                    max_tw * 3600, num_custs)
+        # pickup (outbound trips)
+        pu_time_windows_out = np.random.random_integers(min_tw * 3600,
+                                                        max_tw * 3600, n)
+
         # The last time a pickup window can start
-        latest_time = self.time_horizon - pu_time_windows - 6*3600 # not sure here, but lopping off 6 hrs seems to make things possible
+        latest_time = self.time_horizon - pu_time_windows_out - 9*3600 # not sure here, [but lopping off 6 hrs seems to make things possible] make 9 to account for returns
         start_times = [None for o in range(0,2*num_custs+num_depots)]
         end_times = [None for o in range(0,2*num_custs+num_depots)]
         hard_stop = timedelta(seconds=self.time_horizon - 600)
         # Make random timedeltas, nominaly from the start of the day.
-        for idx in range(0,num_custs):
+        # start with out trips
+        for idx in range(0,n):
             # base time windows on destination, not origin
             deliv_idx = idx+num_custs
             stime = int(np.random.random_integers(0, latest_time[idx]))
             start_times[idx] = timedelta(seconds=stime)
             end_times[idx] = (start_times[idx] +
-                              timedelta(seconds=int(pu_time_windows[idx])))
+                              timedelta(seconds=int(pu_time_windows_out[idx])))
 
             # account for time to travel by growing window as needed
             from_lat = lats[idx]
             from_lon = lons[idx]
             to_lat = lats[idx+num_custs]
             to_lon = lons[idx+num_custs]
-            od_dist = round( spatial.haversine(from_lon,
+            od_dist_out = round( spatial.haversine(from_lon,
                                              from_lat,
                                              to_lon,
                                              to_lat))
-            dtime = self.travel_time( od_dist )
-            start_times[deliv_idx] = min(hard_stop,start_times[idx] + timedelta(seconds=dtime))
-            end_times[deliv_idx] = min(hard_stop,end_times[idx] + timedelta(seconds=dtime))
+            dtime_out = self.travel_time( od_dist_out )
 
+            od_dist_in = round( spatial.haversine(to_lon,
+                                             to_lat,
+                                             from_lon,
+                                             from_lat))
+            dtime_in = self.travel_time( od_dist_in )
+
+            # adjust to account for return trip
+            start_times[deliv_idx] = min(hard_stop,start_times[idx] + timedelta(seconds=dtime_out)
+                                         + timedelta(seconds=(2 * load_time * cust_demands[idx])) + timedelta(seconds=1800) + timedelta(seconds=dtime_in) )  # 1800 is time window for return pickup
+            end_times[deliv_idx] = min(hard_stop,end_times[idx] + timedelta(seconds=dtime_out)
+                                         + timedelta(seconds=(2 * load_time * cust_demands[idx])) + timedelta(seconds=1800) + timedelta(seconds=dtime_in) )  # 1800 is time window for return pickup
+
+            # return trip time window will be latest delivery time (end of pickup window + dtime + "activity time"
+            # "activity time" a constant for now (say 60 minutes), but should probably be a random variable
+            idx_in = idx+n
+            deliv_idx_in = idx+n+num_custs
+            stime_in = end_times[deliv_idx] + timedelta(seconds=(1 * 3600)) # FIXED time of 1 hr after latest delivery
+            start_times[idx_in] = stime_in
+            end_times[idx_in] = (start_times[idx_in] +
+                                 timedelta(seconds=(1800 + dtime_in)))  # assume tight time window (30 minutes plus travel time) for return
         print('done generating time windows at origins, destinations')
 
         # A named tuple for the customer
