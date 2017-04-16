@@ -65,7 +65,8 @@ class Customers():
                  min_demand=1, max_demand=5,
                  min_tw=1, max_tw=5, num_depots=10, load_time=300, 
                  return_pu_win=5,
-                 avg_speed=50):
+                 avg_speed=50,
+                 earliest_start=8*3600):
 
         # the number of customer trips is 2 * the number of custs (n).
         num_custs = 2*n
@@ -148,7 +149,7 @@ class Customers():
         for idx in range(0,n):
             # base time windows on destination, not origin
             deliv_idx = idx+num_custs
-            stime = int(np.random.random_integers(0, latest_time[idx]))
+            stime = int(np.random.random_integers(earliest_start, latest_time[idx]))
 
             # time window for pickup
             start_times[idx] = timedelta(seconds=stime)

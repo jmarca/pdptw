@@ -237,6 +237,8 @@ def main():
                         help='size of time window for return pickup (minutes)')
     parser.add_argument('--avg-speed', type=int, dest='avg_speed',default=50,
                         help='Avg speed of vehicles (km/h)')
+    parser.add_argument('--earliest-start', type=int, dest='earliest_start',default=8*3600,
+                        help='The earliest time for first pickup')
 
     args = parser.parse_args()
 
@@ -254,7 +256,8 @@ def main():
                              num_depots=args.d,
                              load_time=args.load_time, 
                              return_pu_win=args.return_pu_win,
-                             avg_speed=args.avg_speed)
+                             avg_speed=args.avg_speed,
+                             earliest_start=args.earliest_start)
     print ('customers created')
     # print(customers.customers)
 
@@ -391,6 +394,15 @@ def main():
                     )
             routing.AddPickupAndDelivery(cust.index, deliv.index);
 
+            # for all original pickups...
+            # if cust_index < n:
+            #     ret = customers.customers[cust_index+n]
+            #     ret_index = routing.NodeToIndex(ret.index)
+            #     # require that the return pickup to have the same active status
+            #     solver.AddConstraint(
+            #         routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
+            #     )
+
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
             print('index: '+str(cust.index)
@@ -468,7 +480,7 @@ def main():
         ax.plot(clon, clat, 'k.')
         # plot the routes as arrows
         plot_vehicle_routes(vehicle_routes, ax, customers, vehicles)
-        fig.savefig("test.png")
+        fig.savefig("test.png",dpi=900)
     else:
         print('No assignment')
 
