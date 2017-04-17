@@ -235,13 +235,13 @@ def main():
             # for all original pickups...
             # add the constraint that they're either both active or both inactive.
             # if the outbound or return trip cannot be done, do neither
-            # if cust_index < n:
-            #     ret = customers.get_index_of_opposite_trip(cust.index)
-            #     ret_index = routing.NodeToIndex(return_idx)
-            #     # require that the return pickup to have the same active status
-            #     solver.AddConstraint(
-            #         routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
-            #     )
+            if cust_index < n:
+                ret = customers.get_index_of_opposite_trip(cust.index)
+                ret_index = routing.NodeToIndex(ret)
+                # require that the return pickup to have the same active status
+                solver.AddConstraint(
+                    routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
+                )
 
             # apparently that doesn't work!?
 
