@@ -170,7 +170,8 @@ def main():
         routing_enums_pb2.FirstSolutionStrategy.ALL_UNPERFORMED)
     # Disabling Large Neighborhood Search, (this is the default behaviour)
     parameters.local_search_operators.use_path_lns = False
-    parameters.local_search_operators.use_inactive_lns = False
+    # setting the following to true makes the pairing constraint work okay
+    parameters.local_search_operators.use_inactive_lns = True
     # Routing: forbids use of TSPOpt neighborhood,
     parameters.local_search_operators.use_tsp_opt = False
 
@@ -239,11 +240,11 @@ def main():
                 ret = customers.get_index_of_opposite_trip(cust.index)
                 ret_index = routing.NodeToIndex(ret)
                 # require that the return pickup to have the same active status
-                #solver.AddConstraint(
-                    # routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
+                solver.AddConstraint(
+                     routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
                     # time_dimension.CumulVar(cust_index) <= time_dimension.CumulVar(ret_index)
                     # routing.VehicleVar(cust_index) == routing.VehicleVar(ret_index)
-                #)
+                )
 
             # none of those work!?
             # I'm tired and not thinking straight
