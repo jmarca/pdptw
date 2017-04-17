@@ -169,14 +169,14 @@ def main():
     parameters.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.ALL_UNPERFORMED)
     # Disabling Large Neighborhood Search, (this is the default behaviour)
-    parameters.local_search_operators.use_path_lns = False
+    parameters.local_search_operators.use_path_lns = True
     # setting the following to true makes the pairing constraint work okay
     parameters.local_search_operators.use_inactive_lns = True
     # Routing: forbids use of TSPOpt neighborhood,
     parameters.local_search_operators.use_tsp_opt = False
 
     parameters.time_limit_ms = 40 * 60 * 1000  # 40 minutes
-    parameters.use_light_propagation = False
+    parameters.use_light_propagation = True
     # parameters.log_search = True
 
 
