@@ -51,9 +51,7 @@ import veh_output as vo
 
 
 def main():
-    num_custs = 50
-    num_vehicles = 12
-    num_depots = 1
+
     # Create a set of customer, (and depot) custs.
     customers = cu.Customers(num_custs=num_custs, min_demand=1,
                           max_demand=3, box_size=40,
@@ -99,7 +97,6 @@ def main():
                                                  sameStartFinish=True)
 
     print('start function set')
-    # print(customers.customers)
 
     # Set model parameters
     model_parameters = pywrapcp.RoutingModel.DefaultModelParameters()
