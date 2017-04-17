@@ -89,7 +89,7 @@ def make_distance_mat(customers, method='haversine'):
     AssertionError
     """
     number = len(customers)
-    print "DIST MAT SIZE",number,number
+    print ("DIST MAT SIZE",number,number)
     distmat = np.zeros((number, number))
     methods = {'haversine': haversine}
     assert(method in methods)

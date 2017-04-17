@@ -136,8 +136,8 @@ def main():
 
     print('start function set')
     for idx in range(0,n):
-        print customers.customers[idx],"->\n\t",customers.customers[idx+num_custs]
-        print "RETURN",customers.customers[idx+n],"->\n\t",customers.customers[idx+n+num_custs]
+        print( customers.customers[idx],"->\n\t",customers.customers[idx+num_custs])
+        print( "RETURN",customers.customers[idx+n],"->\n\t",customers.customers[idx+n+num_custs])
 
     # Set model parameters
     model_parameters = pywrapcp.RoutingModel.DefaultModelParameters()
