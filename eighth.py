@@ -169,13 +169,14 @@ def main():
     parameters.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.ALL_UNPERFORMED)
     # Disabling Large Neighborhood Search, (this is the default behaviour)
-    parameters.local_search_operators.use_path_lns = False
-    parameters.local_search_operators.use_inactive_lns = False
+    parameters.local_search_operators.use_path_lns = True
+    # setting the following to true makes the pairing constraint work okay
+    parameters.local_search_operators.use_inactive_lns = True
     # Routing: forbids use of TSPOpt neighborhood,
     parameters.local_search_operators.use_tsp_opt = False
 
     parameters.time_limit_ms = 40 * 60 * 1000  # 40 minutes
-    parameters.use_light_propagation = False
+    parameters.use_light_propagation = True
     # parameters.log_search = True
 
 
@@ -235,15 +236,18 @@ def main():
             # for all original pickups...
             # add the constraint that they're either both active or both inactive.
             # if the outbound or return trip cannot be done, do neither
-            # if cust_index < n:
-            #     ret = customers.get_index_of_opposite_trip(cust.index)
-            #     ret_index = routing.NodeToIndex(return_idx)
-            #     # require that the return pickup to have the same active status
-            #     solver.AddConstraint(
-            #         routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
-            #     )
+            if cust_index < n:
+                ret = customers.get_index_of_opposite_trip(cust.index)
+                ret_index = routing.NodeToIndex(ret)
+                # require that the return pickup to have the same active status
+                solver.AddConstraint(
+                     routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
+                    # time_dimension.CumulVar(cust_index) <= time_dimension.CumulVar(ret_index)
+                    # routing.VehicleVar(cust_index) == routing.VehicleVar(ret_index)
+                )
 
-            # apparently that doesn't work!?
+            # none of those work!?
+            # I'm tired and not thinking straight
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
@@ -327,7 +331,10 @@ def main():
                                                                   routing.NodeToIndex(drop+num_custs))))
                   ) if drop < 2*n else "")+
                   ' close: '+str(customers.customers[drop].tw_close)+' demand:'+str(customers.customers[drop].demand))
+            # print(str(time_dimension.CumulVar(routing.NodeToIndex(drop))))
 
+        # for drop in non_depot:
+        #     print(str(routing.VehicleVar(routing.NodeToIndex(drop))))
 
         # you could print debug information like this:
         # print(routing.DebugOutputAssignment(assignment, 'Capacity'))
