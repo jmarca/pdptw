@@ -218,8 +218,9 @@ def main():
             cust_index = routing.NodeToIndex(cust.index)
             # fixme hack I need to add delivery index to pickups,
             # pickup index to deliveries
-            deliv = customers.customers[cust.index+num_custs]
-            deliv_index = routing.NodeToIndex(deliv.index)
+            deliv_idx = customers.get_index_of_other_end(cust.index)
+            deliv_index = routing.NodeToIndex(deliv_idx)
+
             # print ('adding same vehicle constraint')
             solver.AddConstraint(
                 routing.VehicleVar(cust_index) == routing.VehicleVar(deliv_index))
@@ -228,16 +229,21 @@ def main():
             solver.AddConstraint(
                 time_dimension.CumulVar(cust_index) <= time_dimension.CumulVar(deliv_index)
                     )
-            routing.AddPickupAndDelivery(cust.index, deliv.index);
+            routing.AddPickupAndDelivery(cust.index, deliv_idx);
+
 
             # for all original pickups...
+            # add the constraint that they're either both active or both inactive.
+            # if the outbound or return trip cannot be done, do neither
             # if cust_index < n:
-            #     ret = customers.customers[cust_index+n]
-            #     ret_index = routing.NodeToIndex(ret.index)
+            #     ret = customers.get_index_of_opposite_trip(cust.index)
+            #     ret_index = routing.NodeToIndex(return_idx)
             #     # require that the return pickup to have the same active status
             #     solver.AddConstraint(
             #         routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
             #     )
+
+            # apparently that doesn't work!?
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
