@@ -239,11 +239,14 @@ def main():
                 ret = customers.get_index_of_opposite_trip(cust.index)
                 ret_index = routing.NodeToIndex(ret)
                 # require that the return pickup to have the same active status
-                solver.AddConstraint(
-                    routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
-                )
+                #solver.AddConstraint(
+                    # routing.ActiveVar(cust_index) == routing.ActiveVar(ret_index)
+                    # time_dimension.CumulVar(cust_index) <= time_dimension.CumulVar(ret_index)
+                    # routing.VehicleVar(cust_index) == routing.VehicleVar(ret_index)
+                #)
 
-            # apparently that doesn't work!?
+            # none of those work!?
+            # I'm tired and not thinking straight
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
@@ -327,7 +330,10 @@ def main():
                                                                   routing.NodeToIndex(drop+num_custs))))
                   ) if drop < 2*n else "")+
                   ' close: '+str(customers.customers[drop].tw_close)+' demand:'+str(customers.customers[drop].demand))
+            # print(str(time_dimension.CumulVar(routing.NodeToIndex(drop))))
 
+        # for drop in non_depot:
+        #     print(str(routing.VehicleVar(routing.NodeToIndex(drop))))
 
         # you could print debug information like this:
         # print(routing.DebugOutputAssignment(assignment, 'Capacity'))
