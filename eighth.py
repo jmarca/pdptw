@@ -252,7 +252,7 @@ def main():
                   + ' open: ' +str(cust.tw_open) +
                   (' ttime({fr}->{to}):{ttime}'.format(
                       fr=routing.NodeToIndex(cust.index),
-                      to=routing.NodeToIndex(cust.index+num_custs),
+                      to=routing.NodeToIndex(customers.get_index_of_other_end(cust.index)),
                       ttime=str(timedelta(seconds=transit_time_fn(routing.NodeToIndex(cust.index),
                                                                   routing.NodeToIndex(cust.index+num_custs))))
                   ) if cust.index < 2*n else "")+
@@ -303,13 +303,15 @@ def main():
         print('dropped nodes:')
         for drop in dropped:
             drop = int(drop)
+            other_end = customers.get_index_of_other_end(drop)
+            pairedup = sorted([drop,other_end])
+            matching_pair = [customers.get_index_of_opposite_trip(pairedup[0])
+                             ,customers.get_index_of_opposite_trip(pairedup[1])]
             print('index: '+str(drop)
                   +" "
-                  +("Pickup" if drop < n else
-                    "Return Pickup" if drop >= n and drop < 2*n else
-                    "Delivery" if drop >= num_custs and drop < (num_custs+n) else
-                    "Return Delivery" if drop < 2*num_custs else
-                    "Depot")
+                  +"Paired "
+                  +str(matching_pair[0]) +"->"+str(matching_pair[1])
+                  +" "
                   +" "+str(drop%n)
                   + ' open: ' +str(customers.customers[drop].tw_open) +
                   (' ttime({fr}->{to}):{ttime}'.format(

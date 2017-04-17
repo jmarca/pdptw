@@ -63,16 +63,18 @@ class Customers():
     def __init__(self, extents=None, center=(53.381393, -1.474611),
                  box_size=10, n=100,
                  min_demand=1, max_demand=5,
-                 min_tw=1, max_tw=5, num_depots=10, load_time=300, 
+                 min_tw=1, max_tw=5, num_depots=10, load_time=300,
                  return_pu_win=5,
                  avg_speed=50,
                  earliest_start=8*3600):
 
         # the number of customer trips is 2 * the number of custs (n).
-        num_custs = 2*n
-
-        self.number = 2*num_custs+num_depots  #: The number of pickups, delivs, depots
-        self.depots = range(2*num_custs,self.number)
+        # because right now everybody has an outbound and a return trip
+        num_trips = 2*n
+        self.num_trips = num_trips
+        self.num_custs = n
+        self.number = 2*num_trips+num_depots  #: The number of pickups, delivs, depots
+        self.depots = range(2*num_trips,self.number)
         #: Location, a named tuple for locations.
         Location = namedtuple("Location", ['lat', 'lon'])
         if extents is not None:
@@ -99,11 +101,11 @@ class Customers():
                                            np.cos(np.deg2rad(clat)))),
                             'urlat': clat + 180 * box_size / circ_earth}
         # The 'name' of the cust.  Actually will be stops and depots
-        custs = np.array(range(0, num_custs))
-        # The 'name' of the delivery, indexed from num_custs to 2*num_custs-1
-        delivs = np.array(range(num_custs,2*num_custs))
+        custs = np.array(range(0, num_trips))
+        # The 'name' of the delivery, indexed from num_trips to 2*num_trips-1
+        delivs = np.array(range(num_trips,2*num_trips))
 
-        depots = np.array(range(2*num_custs,2*num_custs + num_depots))
+        depots = np.array(range(2*num_trips,2*num_trips + num_depots))
 
         # smush together
         stops = np.concatenate((custs,delivs,depots))
@@ -116,8 +118,14 @@ class Customers():
         lats_in_dest = np.copy(lats_out_orig)
         lons_in_dest = np.copy(lons_out_orig)
         lats_dep, lons_dep = spatial.generate_locations (self.extents,num_depots,6)
-        lats = np.concatenate((lats_out_orig,lats_out_dest,lats_in_orig,lats_in_dest,lats_dep))
-        lons = np.concatenate((lons_out_orig,lons_out_dest,lons_in_orig,lons_in_dest,lons_dep))
+
+        # ordering here should be outbound origin, return trip origin,
+        # outbound destination (which is the same as return trip
+        # origin right now), and then return trip destination.
+        # Origins are grouped, and destinations are grouped.  Dumb,
+        # but there you go.  This whole thing is a hack.
+        lats = np.concatenate((lats_out_orig,lats_in_orig,lats_out_dest,lats_in_dest,lats_dep))
+        lons = np.concatenate((lons_out_orig,lons_in_orig,lons_out_dest,lons_in_dest,lons_dep))
 
         # uniformly distributed integer demands.
         cust_demands_out = np.random.randint(min_demand, max_demand, n)
@@ -141,14 +149,14 @@ class Customers():
 
         # The last time a pickup window can start
         latest_time = self.time_horizon - pu_time_windows_out - 9*3600 # not sure here, [but lopping off 6 hrs seems to make things possible] make 9 to account for returns
-        start_times = [None for o in range(0,2*num_custs+num_depots)]
-        end_times = [None for o in range(0,2*num_custs+num_depots)]
+        start_times = [None for o in range(0,2*num_trips+num_depots)]
+        end_times = [None for o in range(0,2*num_trips+num_depots)]
         hard_stop = timedelta(seconds=self.time_horizon - 600)
         # Make random timedeltas, nominaly from the start of the day.
         # start with out trips
         for idx in range(0,n):
             # base time windows on destination, not origin
-            deliv_idx = idx+num_custs
+            deliv_idx = idx+num_trips
             stime = int(np.random.random_integers(earliest_start, latest_time[idx]))
 
             # time window for pickup
@@ -159,8 +167,8 @@ class Customers():
             # account for time to travel by growing window as needed
             from_lat = lats[idx]
             from_lon = lons[idx]
-            to_lat = lats[idx+num_custs]
-            to_lon = lons[idx+num_custs]
+            to_lat = lats[idx+num_trips]
+            to_lon = lons[idx+num_trips]
             od_dist_out = round( spatial.haversine(from_lon,
                                              from_lat,
                                              to_lon,
@@ -190,16 +198,16 @@ class Customers():
             idx_in = idx+n
 
             # Earliest start time of return pickup should be end_time of delivery plus activity time
-            stime_in = end_times[deliv_idx] + timedelta(seconds=activity_time) 
+            stime_in = end_times[deliv_idx] + timedelta(seconds=activity_time)
             start_times[idx_in] = stime_in
 
             # latest end time of return pickup should be return_pu_win minutes past the start time
             end_times[idx_in] = (start_times[idx_in] +
                                  timedelta(seconds=(return_pu_win*60)))  # assume tight time window of 5 minutes after end of activity
 
-            deliv_idx_in = idx+n+num_custs
+            deliv_idx_in = idx+n+num_trips
             start_times[deliv_idx_in] = (start_times[idx_in] +          # earliest return pickup time plus travel time
-                                         timedelta(seconds=(load_time*cust_demands[idx]+dtime_in))) # travel time 
+                                         timedelta(seconds=(load_time*cust_demands[idx]+dtime_in))) # travel time
             #print('stdii',deliv_idx_in,str(start_times[idx_in]),str(timedelta(seconds=dtime_in)),str(start_times[deliv_idx_in]))
             end_times[deliv_idx_in] = (end_times[idx_in] +
                                        timedelta(seconds=(load_time*cust_demands[idx]+1.25*float(dtime_in))))  # latest return pickup time plus 1.25% of travel time
@@ -362,3 +370,35 @@ class Customers():
             return(self.distmat[a][b] / (speed_kmph * 1.0 / 60 ** 2))
 
         return tranit_time_return
+
+    def get_index_of_other_end(self,idx):
+        """
+        If idx is an origin, will get the corresponding destination.  If
+        idx is a destination, will get the corresponding origin.
+        Args:
+           idx: the index of the node
+        Returns:
+           int: the index of the paired origin or destination of the passed
+                in index.
+        """
+        opposite_idx = idx+self.num_trips
+        if  idx >= self.num_trips:
+            opposite_idx = idx - self.num_trips
+        return opposite_idx
+
+    def get_index_of_opposite_trip(self,idx):
+        """
+        If idx is a pickup node, will get the return pickup node idx.
+        If idx is a delivery node, will get the return delivery node idx.
+        Or vice versa.
+        Args:
+           idx: the index of the node
+        Returns:
+           int: the index of the opposite pickup or delivery node
+        """
+        opposite_idx = idx+self.num_custs
+        if  idx >= self.num_custs and idx < self.num_trips:
+            opposite_idx = idx - self.num_custs
+        if  idx >= self.num_trips + self.num_custs:
+            opposite_idx = idx - self.num_custs
+        return opposite_idx
