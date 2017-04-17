@@ -300,7 +300,26 @@ def main():
         print('The cumulative distance cost is {0}'.format(assignment.ObjectiveValue() - len(dropped)*penalty))
 
         print(plan_output)
-        print('dropped nodes: ' + ', '.join(dropped))
+        print('dropped nodes:')
+        for drop in dropped:
+            drop = int(drop)
+            print('index: '+str(drop)
+                  +" "
+                  +("Pickup" if drop < n else
+                    "Return Pickup" if drop >= n and drop < 2*n else
+                    "Delivery" if drop >= num_custs and drop < (num_custs+n) else
+                    "Return Delivery" if drop < 2*num_custs else
+                    "Depot")
+                  +" "+str(drop%n)
+                  + ' open: ' +str(customers.customers[drop].tw_open) +
+                  (' ttime({fr}->{to}):{ttime}'.format(
+                      fr=routing.NodeToIndex(drop),
+                      to=routing.NodeToIndex(drop+num_custs),
+                      ttime=str(timedelta(seconds=transit_time_fn(routing.NodeToIndex(drop),
+                                                                  routing.NodeToIndex(drop+num_custs))))
+                  ) if drop < 2*n else "")+
+                  ' close: '+str(customers.customers[drop].tw_close)+' demand:'+str(customers.customers[drop].demand))
+
 
         # you could print debug information like this:
         # print(routing.DebugOutputAssignment(assignment, 'Capacity'))
