@@ -251,6 +251,10 @@ def main():
 
         # set the time window constraint for this stop (pickup or delivery)
         if cust.tw_open is not None:
+            # this is where the time window is set as a constraint
+            time_dimension.CumulVar(routing.NodeToIndex(cust.index)).SetRange(
+                cust.tw_open.seconds,
+                cust.tw_close.seconds)
             print('index: '+str(cust.index)
                   +" "
                   +("Pickup" if cust.index < n else
@@ -267,9 +271,7 @@ def main():
                                                                   routing.NodeToIndex(cust.index+num_custs))))
                   ) if cust.index < 2*n else "")+
                   ' close: '+str(cust.tw_close)+' demand:'+str(cust.demand))
-            time_dimension.CumulVar(routing.NodeToIndex(cust.index)).SetRange(
-                cust.tw_open.seconds,
-                cust.tw_close.seconds)
+
     """
      To allow the dropping of orders, we add disjunctions to all the customer
     nodes. Each disjunction is a list of 1 index, which allows that customer to
