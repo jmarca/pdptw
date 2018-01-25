@@ -122,7 +122,7 @@ def main():
     # Create a list of inhomgeneous vehicle capacities as integer units.
     capacity = np.random.random_integers(3, 9, num_vehicles)
 
-    # Create a list of inhomogenious fixed vehicle costs.
+    # Create a list of inhomogeneous fixed vehicle costs.
     cost = [int(100 + 2 * np.sqrt(c)) for c in capacity]
 
     # Create a set of vehicles, the number set by the length of capacity.
