@@ -57,6 +57,8 @@ def main():
                         help='Number of vehicles')
     parser.add_argument('-d,--depots', type=int, dest='d',default=2,
                         help='Number of depots')
+    parser.add_argument('-t,--timeout', type=int, dest='t',default=120,
+                        help='max run time in minutes before giving up')
     parser.add_argument('--min-demand', type=int, dest='min_demand',default=1,
                         help='Minimum demand per customer')
     parser.add_argument('--max-demand', type=int, dest='max_demand',default=3,
@@ -81,6 +83,7 @@ def main():
     n = args.n
     num_custs = 2*n
     num_vehicles = args.v
+    timeout_minutes = args.t
 
     # Create a set of customer, (and depot) custs.
     customers = cu.Customers(n=n,
@@ -175,7 +178,7 @@ def main():
     # Routing: forbids use of TSPOpt neighborhood,
     parameters.local_search_operators.use_tsp_opt = False
 
-    parameters.time_limit_ms = 40 * 60 * 1000  # 40 minutes
+    parameters.time_limit_ms = timeout_minutes * 60 * 1000  # max timeout minutes
     parameters.use_light_propagation = True
     # parameters.log_search = True
 
