@@ -22,7 +22,7 @@ class Vehicles():
 
         cost (scalar or numpy array): The fixed cost of the vehicle.
 
-        number (Optional [int]): The number of vehicles in a homogenious fleet.
+        number (Optional [int]): The number of vehicles in a homogeneous fleet.
     """
     def __init__(self, capacity=100, cost=100, number=None):
 
